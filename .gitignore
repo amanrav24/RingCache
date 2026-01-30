@@ -1,0 +1,23 @@
+# --- Build & Binary Folders ---
+bin/
+build/
+out/
+debug/
+release/
+
+# --- Editor Settings ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS System Files ---
+.DS_Store
+Thumbs.db
+
+# --- Compiled Object Files ---
+*.o
+*.obj
+*.exe
+*.dll
+*.dylib
+*.so
