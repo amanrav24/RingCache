@@ -35,18 +35,17 @@ int main() {
     //     node -> start();
     // }
 
-    testCache.cacheSet("t1", 1);
-    testCache.cacheSet("t2", 2);
-    testCache.cacheSet("t3", 3);
-    // testCache.cacheSet("t2", 2);
+    int res1 = -1;
+    int res2 = -1;
+    int res3 = -1;
 
-    int res1 = 0;
-    int res2 = 0;
-    int res3 = 0;
+    testCache.cacheSet("t1", 1);
+    // testCache.cacheSet("t2", 2);
+    // testCache.cacheSet("t3", 3);
 
     testCache.cacheGet("t1", res1);
-    testCache.cacheGet("t2", res2);
-    testCache.cacheGet("t3", res3);
+    // testCache.cacheGet("t2", res2);
+    // testCache.cacheGet("t3", res3);
 
     //std::cout << "This is res: " << res1 << std::endl;
 
