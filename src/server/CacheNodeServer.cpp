@@ -1,6 +1,8 @@
 #include "server/CacheNodeServer.hpp"
 
-CacheNodeServer::CacheNodeServer(std::string nodeId, int port): info(nodeId), server(port) {
+#include <iostream>
+
+CacheNodeServer::CacheNodeServer(std::string nodeId, int port): server(port), info(nodeId) {
 
 }
 
@@ -16,7 +18,7 @@ void CacheNodeServer::clientHandler(int clientFd) {
     //read from the clientFd
     std::string result = server.readLine(clientFd);
     std::string response = handleCommand(result);
-    server.sendResponse(response);
+    server.sendResponse(response, clientFd);
 }
 
 std::string CacheNodeServer::handleCommand(std::string result) {
@@ -25,12 +27,21 @@ std::string CacheNodeServer::handleCommand(std::string result) {
     json j = json::parse(result);
     json resMesg;
 
-    command = j['op'];
+    command = j["op"];
+
+    if (j["key"].is_string()) {
+        key = j["key"].get<std::string>();
+    } else {
+        key = j["key"].dump();
+    }
 
     if (command == "set") {
-        key = j['key'];
-        value = j['value'];
-        
+        if (j["value"].is_string()) {
+            value = j["value"].get<std::string>();
+        } else {
+            value = j["value"].dump();
+        }
+
         bool res = info.nodeSet(key, value, steadyClock::now() + chrono::seconds(5));
         
         if (res) {
@@ -39,12 +50,10 @@ std::string CacheNodeServer::handleCommand(std::string result) {
             resMesg["status"] = "failed";
         }
     } else if (command == "get") {
-        key = j['key'];
-       
         bool res = info.nodeGet(key, value);
         if (res) {
-            resMesg['status'] = "success";
-            resMesg['value'] = value;
+            resMesg["status"] = "success";
+            resMesg["value"] = value;
         } else {
             resMesg["status"] = "failed";
         }

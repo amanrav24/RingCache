@@ -1,14 +1,29 @@
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -Iinclude -I/opt/homebrew/include
+CXXFLAGS = -std=c++17 -Wall -Iinclude -I/opt/homebrew/include -g
 
-SRC = src/client/ConsistentHashing.cpp src/server/NodeInfo.cpp src/main.cpp src/client/RingCache.cpp src/net/TcpClient.cpp src/net/TcpServer.cpp
-OBJ = $(patsubst src/%.cpp, build/%.o, $(SRC))
+# 1. SHARED SOURCE FILES 
+# (Everything EXCEPT src/main.cpp and src/testSingleNode.cpp)
+SRC_COMMON = src/client/ConsistentHashing.cpp src/server/NodeInfo.cpp src/net/TcpClient.cpp src/net/TcpServer.cpp src/server/CacheNodeServer.cpp
+OBJ_COMMON = $(patsubst src/%.cpp, build/%.o, $(SRC_COMMON))
 
-app: $(OBJ)
+# Default target: builds both executables when you type 'make'
+all: app testSingleNode
+
+# --- TARGET 1: Main Application ---
+# Link Shared Objects + main.o
+app: $(OBJ_COMMON) build/main.o
 	mkdir -p bin
-	$(CXX) $(OBJ) -o bin/app
+	$(CXX) $(OBJ_COMMON) build/main.o -o bin/app
 
+# --- TARGET 2: Test Single Node ---
+# Link Shared Objects + testSingleNode.o
+testSingleNode: $(OBJ_COMMON) build/testSingleNode.o
+	mkdir -p bin
+	$(CXX) $(OBJ_COMMON) build/testSingleNode.o -o bin/testSingleNode
 
+# --- COMPILATION RULES ---
+
+# Generic rule for all .cpp files (handles main.cpp, testSingleNode.cpp, and common files)
 build/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

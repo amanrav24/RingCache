@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <sstream>
+#include <iostream> 
 
 #include "client/ConsistentHashing.hpp"
 #include "server/NodeInfo.hpp"
@@ -18,15 +20,123 @@ template <typename key, typename value>
 class ringCache {
 public:
     //Constructors
-    ringCache(const vector<nodeConfig>& nodes);
-    ~ringCache();
+    ringCache(const vector<nodeConfig>& nodes) {
+        for (size_t i = 0; i < nodes.size(); i++) {
+            hashRing.addNode(nodes[i].nodeId);
+            configs[nodes[i].nodeId] = nodes[i];
+            clients[nodes[i].nodeId] = std::make_unique<tcpClient>(nodes[i].nodeId, nodes[i].port);
+        }
+    }
+
+    ~ringCache() {}
 
     //Operators
-    bool cacheGet(const key& Key, value& Value);
+    bool cacheGet(const key& Key, value& Value) {
+        string nodeId = hashRing.getNode(Key);
 
-    bool cacheSet(const key& Key, const value& Value);
+        if (nodeId == "") {
+            return false;
+        }
 
-    bool cacheDelete(const key& Key);
+        auto& curClient = clients[nodeId];
+        bool connectionRes = curClient->connectToServer();
+
+        if (!connectionRes) {
+            return false;
+        }
+
+        json mesg;
+        mesg["op"] = "get";
+        mesg["key"] =  Key;
+
+        std::string mesgStr = mesg.dump() + "\n";
+
+        bool sendRes = curClient->sendAll(mesgStr);
+
+        if (!sendRes) {
+            return false;
+        }
+
+        std::string result = curClient->receiveLine();
+        parseResult mesgRes = parseResponse(result);
+
+        if (!mesgRes.success) {
+            return false;
+        }
+
+        Value = mesgRes.val;
+
+        return true;
+    }
+
+    bool cacheSet(const key& Key, const value& Value) {
+        string nodeId = hashRing.getNode(Key);
+
+        if (nodeId == "") {
+            return false;
+        }
+
+        auto& curClient = clients[nodeId];
+        bool connectionRes = curClient->connectToServer();
+
+        if (!connectionRes) {
+            return false;
+        }
+
+        json mesg;
+        mesg["op"] = "set";
+        mesg["key"] =  Key;
+        mesg["value"] = Value;
+
+        std::string mesgStr = mesg.dump() + "\n";
+
+        bool sendRes = curClient->sendAll(mesgStr);
+
+        if (!sendRes) {
+            return false;
+        }
+
+        std::string result = curClient->receiveLine();
+        parseResult mesgRes = parseResponse(result);
+
+        if (!mesgRes.success) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool cacheDelete(const key& Key) {
+        string nodeId = hashRing.getNode(Key);
+
+        if (nodeId == "") {
+            return false;
+        }
+
+        auto& curClient = clients[nodeId];
+        bool connectionRes = curClient->connectToServer();
+
+        if (!connectionRes) {
+            return false;
+        }
+
+        json mesg;
+        mesg["op"] = "del";
+        mesg["key"] =  Key;
+
+        std::string mesgStr = mesg.dump() + "\n";
+
+        bool sendRes = curClient->sendAll(mesgStr);
+
+        if (!sendRes) {
+            return false;
+        }
+
+        std::string result = curClient->receiveLine();
+        parseResult mesgRes = parseResponse(result);
+
+        return mesgRes.success;
+    }
 
 private:
     std::unordered_map<std::string, nodeConfig> configs;
@@ -35,19 +145,38 @@ private:
 
     struct parseResult {
         bool success;
-        std::string val; //optional val.
+        value val; //optional val.
+        
+        // Added implicit conversion to bool to support your logic in cacheDelete: if (!mesgRes)
+        operator bool() const { return success; }
     };
 
-    parseResult parseResponse(std::string response);
+    value fromString(const std::string& s) {
+        if constexpr (std::is_same_v<value, std::string>) {
+            return s; // If T is string, just return it.
+        }
+        std::stringstream ss(s);
+        value result;
+        ss >> result; // "Streams" the text into the type (handling parsing logic)
+        return result;
+    }
 
-    // int sendRequestToNode(const NodeInfo& node, 
-    //                       const string& op,
-    //                       const key& k,
-    //                       const value& value,
-    //                       int ttl,
-    //                       Value& result);
+    parseResult parseResponse(std::string response) {
+        std::cout << "This is resp: " << response << std::endl;
+        parseResult res;
+        json resMesg = json::parse(response);
+        if (resMesg["status"] == "failed") {
+            res.success = false;
+            return res;
+        } else {
+            res.success = true;
+            if (resMesg.contains("value")) {
+                res.val = fromString(resMesg["value"].get<std::string>());
+            }
+        }
+
+        return res;
+    }
 };
-
-
 
 #endif

@@ -18,7 +18,7 @@ void tcpServer::start(const clientHandler& handler) {
     }
 }
 
-tcpServer::tcpServer(int inPort) : port(inPort), serverFd(-1) {
+tcpServer::tcpServer(int inPort) : serverFd(-1), port(inPort) {
     try {
         startSocket();
     } catch (const std::exception& e) {
@@ -59,8 +59,8 @@ void tcpServer::startSocket() {
 }
 
 
-void tcpServer::sendResponse(const std::string& data) {
-    if (serverFd == -1) {
+void tcpServer::sendResponse(const std::string& data, int clientFd) {
+    if (clientFd == -1) {
         return;
     }
 
@@ -69,7 +69,7 @@ void tcpServer::sendResponse(const std::string& data) {
     const char *ptr = data.c_str();
 
     while (totalSent < data.length()) {
-        ssize_t bytesSent = send(serverFd, ptr + totalSent, bytesLeft, 0);
+        ssize_t bytesSent = send(clientFd, ptr + totalSent, bytesLeft, 0);
 
         if (bytesSent < 0) {
             return;
@@ -93,7 +93,7 @@ std::string tcpServer::readLine(int serverFd) {
     while (true) {
         size_t loc = result.find('\n');
         if (loc != std::string::npos) {
-            return result.substr(0, loc + 1);
+            return result.substr(0, loc);
         }
 
         ssize_t bytesRecieved = recv(serverFd, buffer, sizeof(buffer), 0);

@@ -11,7 +11,6 @@ using json = nlohmann::json;
 class CacheNodeServer {
 public:
     CacheNodeServer(std::string nodeId, int port);
-    ~CacheNodeServer();
 
     void start();
 private:

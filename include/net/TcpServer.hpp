@@ -16,14 +16,13 @@ public:
     using clientHandler = std::function<void(int clientFd)>;
 
     explicit tcpServer(int port);
-    ~tcpServer();
 
     tcpServer(const tcpServer&) = delete;
     tcpServer& operator=(const tcpServer&) = delete;
 
     void start(const clientHandler& handler);
 
-    void sendResponse(const std::string& data);
+    void sendResponse(const std::string& data, int clientFd);
     std::string readLine(int serverFd);
 private:
     int serverFd;

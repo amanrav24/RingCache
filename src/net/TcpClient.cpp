@@ -44,7 +44,7 @@ std::string tcpClient::receiveLine() {
     while (true) {
         size_t loc = result.find('\n');
         if (loc != std::string::npos) {
-            return result.substr(0, loc + 1);
+            return result.substr(0, loc);
         }
 
         ssize_t bytesRecieved = recv(clientFd, buffer, sizeof(buffer), 0);
