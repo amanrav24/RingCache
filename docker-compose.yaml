@@ -1,0 +1,86 @@
+services:
+  cache-node-1:
+    build: 
+      context: .
+      dockerfile: nodeDocker/Dockerfile
+    networks:
+      - cache-net
+    environment:
+      NODE_ID: 1
+      NODE_IP: cache-node-1
+      PORT: 8080
+      PEERS: cache-node-2:8081,cache-node-3:8082,cache-node-4:8083,cache-node-5:8084
+    container_name: cache-node-1
+
+  cache-node-2:
+    build: 
+      context: .
+      dockerfile: nodeDocker/Dockerfile
+    networks:
+      - cache-net
+    environment:
+      NODE_ID: 2
+      NODE_IP: cache-node-2
+      PORT: 8081
+      PEERS: cache-node-1:8080,cache-node-3:8082,cache-node-4:8083,cache-node-5:8084
+    container_name: cache-node-2
+
+  cache-node-3:
+    build: 
+      context: .
+      dockerfile: nodeDocker/Dockerfile
+    networks:
+      - cache-net
+    environment:
+      NODE_ID: 3
+      NODE_IP: cache-node-3
+      PORT: 8082
+      PEERS: cache-node-1:8080,cache-node-2:8081,cache-node-4:8083,cache-node-5:8084
+    container_name: cache-node-3
+
+  cache-node-4:
+    build: 
+      context: .
+      dockerfile: nodeDocker/Dockerfile
+    networks:
+      - cache-net
+    environment:
+      NODE_ID: 4
+      NODE_IP: cache-node-4
+      PORT: 8083
+      PEERS: cache-node-1:8080,cache-node-2:8081,cache-node-3:8082,cache-node-5:8084
+    container_name: cache-node-4
+
+  cache-node-5:
+    build: 
+      context: .
+      dockerfile: nodeDocker/Dockerfile
+    networks:
+      - cache-net
+    environment:
+      NODE_ID: 5
+      NODE_IP: cache-node-5
+      PORT: 8084
+      PEERS: cache-node-1:8080,cache-node-2:8081,cache-node-3:8082,cache-node-4:8083
+    container_name: cache-node-5
+  
+  cache-client:
+    build:   # or a separate Dockerfile for startCache
+      context: .
+      dockerfile: cacheDocker/Dockerfile
+    networks:
+      - cache-net
+    depends_on:
+      - cache-node-1
+      - cache-node-2
+      - cache-node-3
+      - cache-node-4
+      - cache-node-5
+    environment:
+      NODE_LIST: cache-node-1:8080,cache-node-2:8081,cache-node-3:8082,cache-node-4:8083,cache-node-5:8084
+    stdin_open: true
+    tty: true
+
+networks:
+  cache-net:
+    driver: bridge

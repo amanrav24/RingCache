@@ -1,35 +1,43 @@
 #include <net/TcpClient.hpp>
 
 
-tcpClient::tcpClient(std::string hostString, int port):  host(hostString), port(port) {
+tcpClient::tcpClient(std::string hostString, int port, std::string ipAddr):  host(hostString), port(port), ipAddr(ipAddr) {
 }
 
 
 bool tcpClient::connectToServer() {
     clientFd = socket(AF_INET, SOCK_STREAM, 0);
     if (clientFd == -1) {
+        std::cout << "Socket creation failed" << std::endl;
         clientFd = -1;
         return false;
     }
 
-    struct sockaddr_in address;
-    memset(&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    address.sin_port = htons(port);
+    struct addrinfo hints, *res;
+    std::memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;       // Force IPv4
+    hints.ai_socktype = SOCK_STREAM; // TCP
 
-    //local-host for testing
-    if (inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) <= 0) {
+    std::string portStr = std::to_string(port);
+    std::cout << ipAddr.c_str() << std::endl;
+    int status = getaddrinfo(ipAddr.c_str(), portStr.c_str(), &hints, &res);
+    if (status != 0) {
+        std::cout << "Address resolution failed: " << gai_strerror(status) << std::endl;
         close(clientFd);
         clientFd = -1;
         return false;
     }
 
-    if (connect(clientFd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+
+    if (connect(clientFd, res->ai_addr, res->ai_addrlen) < 0) {
+        std::cout << "connect failed" << std::endl;
+        freeaddrinfo(res); // Important: free memory before returning
         close(clientFd);
         clientFd = -1;
         return false;
     }
 
+    freeaddrinfo(res);
     return true;
 }
 

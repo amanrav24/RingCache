@@ -8,12 +8,13 @@
 #include <cstring>
 #include <arpa/inet.h>
 #include <iostream>
+#include <netdb.h>
 
 
 
 class tcpClient {
 public:
-    tcpClient(std::string hostString, int port);
+    tcpClient(std::string hostString, int port, std::string ipAddr);
     ~tcpClient();
 
     tcpClient(const tcpClient&) = delete;
@@ -27,5 +28,7 @@ public:
 private:
     std::string host;
     int port;
+    std::string ipAddr;
+
     int clientFd;
 };

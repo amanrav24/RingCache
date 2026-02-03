@@ -24,7 +24,7 @@ public:
         for (size_t i = 0; i < nodes.size(); i++) {
             hashRing.addNode(nodes[i].nodeId);
             configs[nodes[i].nodeId] = nodes[i];
-            clients[nodes[i].nodeId] = std::make_unique<tcpClient>(nodes[i].nodeId, nodes[i].port);
+            clients[nodes[i].nodeId] = std::make_unique<tcpClient>(nodes[i].nodeId, nodes[i].port, nodes[i].ipAddress);
         }
     }
 
@@ -73,6 +73,7 @@ public:
         string nodeId = hashRing.getNode(Key);
 
         if (nodeId == "") {
+            std::cout << "Failed to find node" << std::endl;
             return false;
         }
 
@@ -80,6 +81,7 @@ public:
         bool connectionRes = curClient->connectToServer();
 
         if (!connectionRes) {
+            std::cout << "Failed to connect to server" << std::endl;
             return false;
         }
 
@@ -93,6 +95,7 @@ public:
         bool sendRes = curClient->sendAll(mesgStr);
 
         if (!sendRes) {
+            std::cout << "Failed to send" << std::endl;
             return false;
         }
 
@@ -100,6 +103,7 @@ public:
         parseResult mesgRes = parseResponse(result);
 
         if (!mesgRes.success) {
+            std::cout << "Mesg failed" << std::endl;
             return false;
         }
 
