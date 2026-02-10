@@ -1,4 +1,5 @@
 services:
+  # --- C++ Cache Nodes ---
   cache-node-1:
     build: 
       context: .
@@ -65,7 +66,7 @@ services:
     container_name: cache-node-5
   
   cache-client:
-    build:   # or a separate Dockerfile for startCache
+    build:
       context: .
       dockerfile: cacheDocker/Dockerfile
     networks:
@@ -80,6 +81,30 @@ services:
       NODE_LIST: cache-node-1:8080,cache-node-2:8081,cache-node-3:8082,cache-node-4:8083,cache-node-5:8084
     stdin_open: true
     tty: true
+
+  # --- Metrics(Prom. + Grafana) ---
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml # Mounts config file
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - "9090:9090"
+    networks:
+      - cache-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000" # Expose Dashboard to host
+    networks:
+      - cache-net
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # def. login: admin/admin
 
 networks:
   cache-net:

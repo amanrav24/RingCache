@@ -1,5 +1,5 @@
-#include <server/NodeInfo.hpp>
-
+#include "server/NodeInfo.hpp"
+#include "metrics/MetricsRegistry.hpp"
 
 NodeInfo::NodeInfo(const string& id) {
     nodeId = id;
@@ -18,42 +18,53 @@ string NodeInfo::getId() const {
 }
 
 bool NodeInfo::nodeDelete(const std::string& key) {
-    m.lock();
+    std::lock_guard<std::mutex> lock(m); 
+    
+    // Decrement if key exists
     if (store.find(key) != store.end()) {
         store.erase(key);
+        MetricsRegistry::getInstance().decrementKeysStored();
     }
 
     if (expiration.find(key) != expiration.end()) {
         expiration.erase(key);
     }
-    m.unlock();
 
     return true;
 }
 
 
 bool NodeInfo::nodeGet(const std::string& key, std::string& value) {
-    //Already expired/removed
-    m.lock();
+    std::lock_guard<std::mutex> lock(m);
+
+    // Already expired/removed
     if (store.find(key) == store.end()) {
         return false;
     }
 
+    // Check expiration on access (Lazy Expiration)
     if (expiration.find(key) != expiration.end() && expiration[key] <= steadyClock::now()) {
         expiration.erase(key);
         store.erase(key);
+        
+        // Decrement because it expired
+        MetricsRegistry::getInstance().decrementKeysStored();
         return false;
     }
 
     value = store[key];
-    m.unlock();
-
     return true;
 }
 
 
 bool NodeInfo::nodeSet(const std::string& key, const std::string& value, timePoint exp) {
-    m.lock();
+    std::lock_guard<std::mutex> lock(m);
+    
+    // Only increment if this is a NEW key (not an update)
+    if (store.find(key) == store.end()) {
+        MetricsRegistry::getInstance().incrementKeysStored();
+    }
+
     store[key] = value;
     expiration[key] = exp;
     
@@ -62,8 +73,6 @@ bool NodeInfo::nodeSet(const std::string& key, const std::string& value, timePoi
     newEntry.key = key;
 
     timeToLive.push(newEntry);
-    m.unlock();
-
     return true;
 }  
 
@@ -72,14 +81,13 @@ void NodeInfo::backgroundCleanup() {
         queueCleanup();
         std::this_thread::sleep_for(std::chrono::seconds(5));
     }
-
-    return;
 }
 
 void NodeInfo::queueCleanup() {
     auto timeNow = steadyClock::now();
     
-    m.lock();
+    std::lock_guard<std::mutex> lock(m);
+    
     while (!stopRequested && !timeToLive.empty()) {
         const cacheEntry& topEntry = timeToLive.top();
 
@@ -87,18 +95,18 @@ void NodeInfo::queueCleanup() {
             break;
         }
 
-        if (!stopRequested) {
-            auto it = expiration.find(topEntry.key);
+        // Double check expiration map to ensure it wasn't updated/removed elsewhere
+        auto it = expiration.find(topEntry.key);
 
-            if (!stopRequested && it != expiration.end()) {
+        if (!stopRequested && it != expiration.end()) {
+            // Decrement on background expiration
+            if (store.find(topEntry.key) != store.end()) {
                 store.erase(topEntry.key);
-                expiration.erase(topEntry.key);
+                MetricsRegistry::getInstance().decrementKeysStored();
             }
+            expiration.erase(topEntry.key);
         }   
         
         timeToLive.pop();
     }
-    m.unlock();
 }
-
-

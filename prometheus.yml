@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s # Scrape frequently to see real-time updates
+
+scrape_configs:
+  - job_name: 'ring_cache_nodes'
+    static_configs:
+      - targets: 
+        - 'cache-node-1:9090'
+        - 'cache-node-2:9090'
+        - 'cache-node-3:9090'
+        - 'cache-node-4:9090'
+        - 'cache-node-5:9090'

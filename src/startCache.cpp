@@ -1,10 +1,70 @@
 #include <client/RingCache.hpp>
-#include <server/CacheNodeServer.hpp>
-
 #include <iostream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <thread>
+#include <chrono>
+#include <random>
+#include <atomic>
+
+// Configuration for the Load Test
+const int NUM_THREADS = 4;           
+const int REQUESTS_PER_THREAD = 2500;
+const bool CONTINUOUS_MODE = false;  
+
+
+std::atomic<int> total_ops{0};
+
+/**
+ * Generates a random string to use as a key.
+ */
+std::string randomKey(int length = 5) {
+    static const char alphanum[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::string s;
+    s.reserve(length);
+    for (int i = 0; i < length; ++i) {
+        s += alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+    return "key_" + s;
+}
+
+void clientWorker(std::vector<nodeConfig> cluster, int id) {
+    // Each thread gets its own client to ensure thread-safety on the socket layer
+    ringCache<std::string, int> client(cluster);
+    
+    // Seed random number generator differently for each thread
+    srand(time(NULL) + id); 
+
+    int ops = 0;
+    while (CONTINUOUS_MODE || ops < REQUESTS_PER_THREAD) {
+        std::string key = randomKey();
+        int value = rand() % 1000;
+        int result_val = -1;
+
+        // 1. SET Operation
+        bool setRes = client.cacheSet(key, value);
+        
+        // 2. GET Operation
+        bool getRes = client.cacheGet(key, result_val);
+
+        // Verification (Optional: disable for raw speed)
+        if (setRes && getRes && result_val != value) {
+            std::cerr << "[Thread " << id << "] Data Mismatch! Key: " << key << std::endl;
+        }
+
+        ops++;
+        total_ops++;
+    }
+}
 
 int main(int argc, char * argv[]) {
+    // --- 1. Setup Cluster Configuration (Same as before) ---
     const char* env = std::getenv("NODE_LIST");
+    if (!env) {
+        std::cerr << "NODE_LIST environment variable not found." << std::endl;
+        return 1;
+    }
     std::string nodeList(env);
 
     std::vector<std::string> nodes;
@@ -15,40 +75,46 @@ int main(int argc, char * argv[]) {
         nodes.push_back(item);
     }
     
-    //Formatted for the purpose of docker testing --> look at environment varibles
-    //nodeId can be resolved to ipAddr within docker network
     std::vector<nodeConfig> cluster;
     for (size_t i = 0; i < nodes.size(); i++) {
         size_t loc = nodes[i].find(":");
         std::string nodeId = nodes[i].substr(0, loc);
-        std::string ipAddr = nodeId;
+        std::string ipAddr = nodeId; // Docker DNS resolution
         int port = std::stoi(nodes[i].substr(loc + 1));
-        cluster.push_back(
-            {nodeId, ipAddr, port}
-        );
+        cluster.push_back({nodeId, ipAddr, port});
     }
 
-    ringCache<std::string, int> testCache(cluster);
+    std::cout << "--- Starting Distributed Load Test ---" << std::endl;
+    std::cout << "Nodes: " << cluster.size() << std::endl;
+    std::cout << "Threads: " << NUM_THREADS << std::endl;
+    std::cout << "Requests Per Thread: " << REQUESTS_PER_THREAD << std::endl;
+    std::cout << "Target Total Requests: " << (NUM_THREADS * REQUESTS_PER_THREAD * 2) << " (Set + Get)" << std::endl;
 
-    std::cout << "Cache Configured" << std::endl;
+    // --- 2. Start Timer ---
+    auto start_time = std::chrono::high_resolution_clock::now();
 
-    //Cache test actions below
-    int res1 = -1;
-    int res2 = -1;
-    int res3 = -1;
+    // --- 3. Launch Workers ---
+    std::vector<std::thread> workers;
+    for (int i = 0; i < NUM_THREADS; i++) {
+        workers.emplace_back(clientWorker, cluster, i);
+    }
 
+    // --- 4. Wait for Completion ---
+    for (auto& t : workers) {
+        if (t.joinable()) t.join();
+    }
 
-    bool set1 = testCache.cacheSet("t1", 1);
-    bool set2 = testCache.cacheSet("t2", 2);
-    bool set3 = testCache.cacheSet("t3", 3);
-
-    bool get1 = testCache.cacheGet("t1", res1);
-    bool get2 = testCache.cacheGet("t2", res2);
-    bool get3 = testCache.cacheGet("t3", res3);
+    // --- 5. Calculate Metrics ---
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end_time - start_time;
     
-    std::cout << "This is set: " << set1 << " " << set2 << " " << set3 << " " << std::endl;
-    std::cout << "This is res: " << get1 << " " << get2 << " " << get3 << " " << std::endl;
-    std::cout << "This is res: " << res1 << " " << res2 << " " << res3 << " " << std::endl;
+    // Total operations = Sets + Gets
+    int actual_ops = total_ops * 2; 
+
+    std::cout << "\n--- Load Test Complete ---" << std::endl;
+    std::cout << "Time Elapsed: " << diff.count() << " s" << std::endl;
+    std::cout << "Total Operations: " << actual_ops << std::endl;
+    std::cout << "Throughput: " << (actual_ops / diff.count()) << " Requests/Sec" << std::endl;
 
     return 0;
 }
