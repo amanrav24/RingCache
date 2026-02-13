@@ -144,26 +144,11 @@ ring-cache/
 
 ## 🚀 Getting Started
 
-### Build
+### Build/Launch in Docker
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
-```
-
-### Run a Node
-
-```bash
-./ring_cache_node --port 6379
-```
-
-### Example Client Request
-
-```
-SET mykey hello
-GET mykey
+#Build and launch a client and 5 nodeServers, sending 2500 requests over 4 threads 
+docker-compose up --build
 ```
 ---
 
@@ -174,7 +159,6 @@ GET mykey
 * TTL / expiration support
 * Async I/O (`epoll` / `io_uring`)
 * Binary protocol instead of text-based commands
-* Metrics and observability
 
 ---
 
