@@ -1,8 +1,8 @@
 # RingCache
 
-RingCache is a **Redis-inspired, distributed in-memory key–value cache** written in modern C++. It is designed as a **systems-focused learning project** that explores how real-world caches work under the hood, including networking, consistent hashing, concurrency, and eviction policies.
+RingCache is a **Redis-inspired, distributed in-memory key–value cache** written in modern C++. It is designed as a **systems-focused learning project** that explores how real-world caches work under the hood, including networking, consistent hashing, concurrency, eviction policies, and metrics.
 
-This project prioritizes **clarity of architecture and correctness** over raw performance, making it ideal for learning and experimentation.
+This project prioritizes **clarity of architecture and correctness** with performance in mind.
 
 ---
 
@@ -16,6 +16,7 @@ This project prioritizes **clarity of architecture and correctness** over raw pe
 * **TCP-based client–server communication**
 * **Thread-safe design** (mutex-protected critical sections)
 * **Header-only core data structures** for easy reuse
+* **Atomic Metrics System** for efficient logging
 
 ---
 
@@ -51,7 +52,6 @@ RingCache (local storage)
 
 * Maps keys to cache nodes using a hash ring
 * Minimizes key redistribution when nodes join or leave
-* Supports virtual nodes for better load balancing
 
 #### 4. `CacheNodeServer`
 
@@ -68,19 +68,41 @@ RingCache (local storage)
 
 ```
 ring-cache/
-├── include/
-│   ├── RingCache.hpp
-│   ├── ConsistentHashing.hpp
-│   ├── NodeInfo.hpp
-│   └── CacheNode.hpp
-├── src/
-│   ├── CacheNodeServer.cpp
-│   ├── main.cpp
-│   └── utils.cpp
-├── tests/
-│   └── ring_cache_tests.cpp
-├── CMakeLists.txt
-└── README.md
+
+├── Makefile
+├── include
+│   ├── client
+│   │   ├── ConsistentHashing.hpp
+│   │   └── RingCache.hpp
+│   ├── conf
+│   │   └── nodeConfig.hpp
+│   ├── metrics
+│   │   ├── MetricsRegistry.hpp
+│   │   └── MetricsServer.hpp
+│   ├── net
+│   │   ├── TcpClient.hpp
+│   │   └── TcpServer.hpp
+│   └── server
+│       ├── CacheNodeServer.hpp
+│       └── NodeInfo.hpp
+└── src
+    ├── client
+    │   └── ConsistentHashing.cpp
+    ├── main.cpp
+    ├── net
+    │   ├── TcpClient.cpp
+    │   └── TcpServer.cpp
+    ├── server
+    │   ├── CacheNodeServer.cpp
+    │   └── NodeInfo.cpp
+    ├── startCache.cpp
+    └── startNode.cpp
+├── cacheDocker
+│   └── Dockerfile
+├── nodeDocker
+│   └── Dockerfile
+├── docker-compose.yaml
+├── prometheus.yml
 ```
 
 ---
@@ -122,44 +144,12 @@ ring-cache/
 
 ## 🚀 Getting Started
 
-### Build
+### Build/Launch in Docker
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+#Build and launch a client and 5 nodeServers, sending 2500 requests over 4 threads 
+docker-compose up --build
 ```
-
-### Run a Node
-
-```bash
-./ring_cache_node --port 6379
-```
-
-### Example Client Request
-
-```
-SET mykey hello
-GET mykey
-```
-
----
-
-## 🧪 Testing
-
-Unit tests validate:
-
-* Ring buffer eviction behavior
-* Correct key placement via consistent hashing
-* Edge cases (empty cache, overwrite, wraparound)
-
-Run tests:
-
-```bash
-ctest
-```
-
 ---
 
 ## 📈 Future Improvements
@@ -169,7 +159,6 @@ ctest
 * TTL / expiration support
 * Async I/O (`epoll` / `io_uring`)
 * Binary protocol instead of text-based commands
-* Metrics and observability
 
 ---
 
@@ -181,6 +170,8 @@ This project demonstrates proficiency in:
 * Systems design and tradeoffs
 * Networking fundamentals
 * Distributed systems concepts
+* Testing and visualizing with Docker, Prometheus, and Grafana
+* Use c++ std::memory_order_relaxed to understand metrics
 
 ---
 
