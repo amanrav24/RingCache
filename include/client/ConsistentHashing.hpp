@@ -6,35 +6,37 @@
 
 using namespace std;
 
-class ConsistentHashingRing {
+class ConsistentHashingRing
+{
 public:
-    void addNode(const string& nodeId);
-    
-    void removeNode(const string& nodeId);
-  
+    void addNode(const string &nodeId);
+
+    void removeNode(const string &nodeId);
+
     template <typename Key>
-    string getNode(const Key& key) const {
-        if(ring.empty()) {
+    string getNode(const Key &key) const
+    {
+        if (ring.empty())
+        {
             return "";
         }
 
-        size_t keyHash = hash<string>{}(key);
+        size_t keyHash = hash<Key>{}(key);
 
         auto it = ring.lower_bound(keyHash);
 
-        //Special Case: When key is greater than all keys, so assign to first key
-        if (it == ring.end()) {
-            return ring.begin() -> second;
+        // Special Case: When key is greater than all keys, so assign to first key
+        if (it == ring.end())
+        {
+            return ring.begin()->second;
         }
 
-        return it -> second;
+        return it->second;
     }
 
 private:
     map<size_t, string> ring;
-    //implement virtual nodes later here
+    static constexpr int virtual_nodes = 100;
 };
-
-
 
 #endif
