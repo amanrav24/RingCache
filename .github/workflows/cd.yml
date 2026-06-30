@@ -1,0 +1,70 @@
+# CD Pipeline — runs only when code lands on main.
+# Purpose: publish versioned Docker images to GitHub Container Registry (ghcr.io)
+# so any machine can pull and run a specific, known-good version of the cache node.
+#
+# Key concepts demonstrated here:
+#   permissions:        — you must explicitly grant write access to packages (images)
+#   secrets.GITHUB_TOKEN — auto-injected by GitHub; no manual secret setup needed
+#   github.sha          — the full commit hash; used to tag images for traceability
+#   docker/login-action — official Action for authenticating to any container registry
+#   docker/build-push-action — builds the image and pushes to the registry in one step
+#
+# After this runs, images are pullable as:
+#   docker pull ghcr.io/<your-username>/ringcache/cache-node:latest
+#   docker pull ghcr.io/<your-username>/ringcache/cache-node:<full-git-sha>
+
+name: CD
+
+on:
+  push:
+    branches: [main]   # Only runs when something merges to main, not on PRs
+
+jobs:
+  push-images:
+    name: Build & Push Docker Images to GHCR
+    runs-on: ubuntu-24.04
+
+    # Without this block, the GITHUB_TOKEN only has read permission on packages.
+    # The CD pipeline needs write access to push images.
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Authenticate to GitHub Container Registry using the auto-injected token.
+      # GITHUB_TOKEN is a short-lived credential GitHub creates per workflow run —
+      # you never store it as a secret yourself.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build and push the cache NODE image.
+      # Two tags are pushed simultaneously:
+      #   :latest — always points to the newest main build (convenient for dev)
+      #   :<sha>  — immutable pointer to this exact commit (required for tracing prod incidents)
+      - name: Build & push cache-node image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: nodeDocker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/cache-node:latest
+            ghcr.io/${{ github.repository }}/cache-node:${{ github.sha }}
+
+      # Build and push the load-test CLIENT image.
+      - name: Build & push cache-client image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: cacheDocker/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/cache-client:latest
+            ghcr.io/${{ github.repository }}/cache-client:${{ github.sha }}

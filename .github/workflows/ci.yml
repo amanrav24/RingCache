@@ -1,0 +1,111 @@
+# CI Pipeline — runs on every push and every PR targeting main.
+# Purpose: catch broken builds and integration failures BEFORE they land on main.
+#
+# Key concepts demonstrated here:
+#   on:        — when this workflow triggers
+#   jobs:      — independent units of work; these two run IN PARALLEL on separate VMs
+#   steps:     — sequential commands within a job
+#   uses:      — a reusable "Action" from the GitHub Actions marketplace
+#   run:       — an inline shell command
+#   needs:     — makes one job wait for another to succeed first
+#   if: always() — run a cleanup step even if earlier steps failed
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]        # every branch you push
+  pull_request:
+    branches: [main]        # every PR targeting main
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Job 1: Native build + static analysis
+  # Fast feedback (~1 min). Catches compilation errors and common
+  # C++ bugs before you even wait for Docker to build.
+  # ──────────────────────────────────────────────────────────────
+  build:
+    name: Build & Static Analysis
+    runs-on: ubuntu-24.04   # GitHub-hosted VM, same OS as your Dockerfiles
+
+    steps:
+      # 1. Check out your repo's code onto the runner VM.
+      #    actions/checkout is the most-used Action in the ecosystem.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Install the same deps your Dockerfiles use.
+      #    nlohmann/json.hpp lands at /usr/include/nlohmann/json.hpp,
+      #    which is on the default include path so the Makefile works as-is.
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y clang build-essential nlohmann-json3-dev cppcheck
+
+      # 3. Compile everything. Fails the job if any translation unit errors out.
+      - name: Build
+        run: make
+
+      # 4. Static analysis with cppcheck.
+      #    --error-exitcode=1 makes this step fail (and block the PR) if issues found.
+      #    --suppress=missingIncludeSystem silences noise about system headers.
+      - name: Static analysis (cppcheck)
+        run: |
+          cppcheck \
+            --enable=warning,performance,portability \
+            --error-exitcode=1 \
+            --suppress=missingIncludeSystem \
+            src/
+
+      # 5. Upload compiled binaries as a build artifact.
+      #    Artifacts persist 90 days and can be downloaded from the Actions UI.
+      #    This lets you grab a binary from a specific CI run without rebuilding.
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: ringcache-binaries-${{ github.sha }}
+          path: bin/
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 2: Integration test via Docker Compose
+  # Proves the full system actually works: images build, nodes
+  # start, consistent hashing routes correctly, TCP protocol holds.
+  # Runs IN PARALLEL with Job 1 — no `needs:` here.
+  # ──────────────────────────────────────────────────────────────
+  integration-test:
+    name: Integration Test (Docker Compose)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Build both images. '--build' forces a fresh build even if
+      # a cached layer exists on this runner.
+      - name: Build Docker images
+        run: docker compose build
+
+      # Start the 5 cache nodes in detached (-d) mode.
+      # We don't start Prometheus/Grafana — they're not needed for correctness.
+      - name: Start cache cluster
+        run: |
+          docker compose up -d \
+            cache-node-1 cache-node-2 cache-node-3 cache-node-4 cache-node-5
+
+      # Give nodes a moment to bind their ports before the client hammers them.
+      - name: Wait for nodes to be ready
+        run: sleep 5
+
+      # Run the load-test client as a one-shot container.
+      # --rm removes the container after it exits.
+      # This step fails (non-zero exit) if the client crashes or can't connect,
+      # which would block the PR.
+      - name: Run load-test client
+        run: docker compose run --rm cache-client
+        timeout-minutes: 2
+
+      # Always tear down the cluster — even if the test step above failed.
+      # 'if: always()' is how you write cleanup/teardown in GitHub Actions.
+      - name: Tear down cluster
+        if: always()
+        run: docker compose down
