@@ -1,6 +1,6 @@
 CXX = clang++
-#CXXFLAGS = -std=c++17 -Wall -Iinclude -g
-CXXFLAGS = -std=c++17 -Wall -Iinclude -I/opt/homebrew/include -g
+#CXXFLAGS = -std=c++20 -Wall -Iinclude -g
+CXXFLAGS = -std=c++20 -Wall -Iinclude -I/opt/homebrew/include -g
 
 # 1. SHARED SOURCE FILES 
 # (Everything EXCEPT src/main.cpp and src/startNode.cpp and src/startCache.cpp)
