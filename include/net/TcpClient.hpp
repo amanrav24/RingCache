@@ -30,5 +30,9 @@ private:
     int port;
     std::string ipAddr;
 
+    // helper disconnect function
+    void disconnect();
+    bool attempt_reconnect();
+
     int clientFd;
 };
