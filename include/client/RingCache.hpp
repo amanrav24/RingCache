@@ -168,6 +168,10 @@ private:
     parseResult parseResponse(std::string response) {
         std::cout << "This is resp: " << response << std::endl;
         parseResult res;
+        if (response.empty()) {
+            res.success = false;
+            return res;
+        }
         json resMesg = json::parse(response);
         if (resMesg["status"] == "failed") {
             res.success = false;
