@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cache-client
+spec:
+  initContainers:
+    - name: wait-for-nodes
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          for i in 0 1 2 3 4; do
+            until nc -z cache-node-$i.cache-svc 8080; do
+              echo "Waiting for cache-node-$i..."; sleep 2;
+            done
+            echo "cache-node-$i is up"
+          done
+  containers:
+    - name: cache-client
+      image: ring-cache-client:latest
+      imagePullPolicy: Never
+      envFrom:
+        - configMapRef:
+            name: cache-client-config
+  restartPolicy: Never

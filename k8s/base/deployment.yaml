@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cache-node
+spec:
+  serviceName: cache-svc       
+  replicas: 5
+  selector:
+    matchLabels:
+      app: cache-node
+  template:
+    metadata:
+      labels:
+        app: cache-node
+    spec:
+      containers:
+        - name: cache-node
+          image: ring-cache-node:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          env:
+            - name: PORT
+              value: "8080"
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name   
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name    
