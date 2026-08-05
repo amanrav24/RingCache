@@ -1,6 +1,6 @@
 # RingCache
 
-RingCache is a **Redis-inspired, distributed in-memory key–value cache** written in modern C++. It is designed as a **systems-focused learning project** that explores how real-world caches work under the hood, including networking, consistent hashing, concurrency, eviction policies, and metrics.
+RingCache is a **memcache-inspired, distributed in-memory key–value cache** written in modern C++. It is designed as a **systems-focused learning project** that explores how real-world caches work under the hood, including networking, consistent hashing, concurrency, eviction policies, and metrics.
 
 This project prioritizes **clarity of architecture and correctness** with performance in mind.
 
